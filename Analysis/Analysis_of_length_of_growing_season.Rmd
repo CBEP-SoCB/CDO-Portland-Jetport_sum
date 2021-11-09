@@ -1,0 +1,157 @@
+---
+title: "Analysis of Length of Growing Season"
+author:  "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "11/09/2021"
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center',
+                      fig.width = 5, fig.height = 4,
+                      collapse = TRUE, comment = "#>")
+```
+
+# Load Libraries
+```{r}
+library(tidyverse)
+library(readr)
+library(mblm)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
+```
+
+# Read Data
+The frost-free period needs to be derived directly from the daily temperature data.  Note that temperature in the source data is in tenths of a degree C.
+```{r}
+sibfldnm <- 'Data'
+parent <- dirname(getwd())
+sibling <- paste(parent,sibfldnm, sep = '/')
+fn <- 'longdailydata.csv'
+
+longdailydata <- read_csv(paste(sibling,fn, sep = '/')) %>%
+  select(-station) %>%
+  filter(datatype %in% c('TMAX', 'TMIN')) %>%
+  mutate(doy =  as.numeric(format(date, format='%j'))) %>%
+  mutate(month = as.numeric(format(date, format='%m'))) %>%
+  mutate(year = as.numeric(format(date, format='%Y'))) %>%
+  mutate(cyear = year-1980)
+```
+
+# Find First and Last Frost Dates
+The following strategy was suggested by a Stack Overflow answer here:  
+https://stackoverflow.com/questions/41328946/find-last-values-by-condition
+
+In brief, we filter a dataframe down to data that meets our criteria -- here, days with temperatures below freezing -- and then group_by() to isolate data from each year, and finally slice() to pick the first or last item in the list.  Be aware that this strategy depends on the data being in chronological order.
+```{r}
+cutoffinF <- 32
+cutoffinC <- (cutoffinF - 32) * 5/9
+
+firstfrosts <- longdailydata %>%
+  spread(key = datatype, value = value) %>%
+  filter(year>1940) %>%                 # 1940 is an incomplete year in the daily data
+  mutate(TMIN = TMIN/10) %>%            # raw data is in tenths of degree C
+  filter(TMIN<= cutoffinC) %>%          # Only days below freezing
+  filter(month>=7) %>%                  # only the last half of the year
+  group_by(year) %>%
+  slice(1)  %>%                         # Choose the first record
+  select(date, year, doy)
+
+lastfrosts <- longdailydata %>%
+  spread(key = datatype, value = value) %>%
+  filter(year>1940) %>%                 # 1940 is an incomplete year in the daily data
+  mutate(TMIN = TMIN/10) %>%            # raw data is in tenths of degree C
+  filter(TMIN<= cutoffinC) %>%          # Only days below freezing
+  filter(month<7) %>%                   # only the first half of the year
+  group_by(year) %>%
+  slice(n())  %>%                       # Choose the last record
+  select(date, year, doy)
+
+frosts <- inner_join(firstfrosts,lastfrosts, by = "year", suffix = c('.first', '.last')) %>%
+  mutate(frostfree = doy.first - doy.last - 1) # calculate frost-free period
+
+rm(firstfrosts,lastfrosts)
+```
+
+# Statistical Analysis
+## Frost Free Period
+We start with a Gaussian model.
+```{r}
+ffdays.lm <- lm(frostfree~ year, data = frosts)
+summary(ffdays.lm)
+```
+So, on average, the number of frost free days over the last 80 years has 
+declined by about half a day a year, or about 39 days overall.
+```{r}
+ round(coef(ffdays.lm)[2]*80,2)
+```
+
+```{r}
+oldpar <- par(mfrow=c(2,2))
+plot(ffdays.lm)
+par(oldpar)
+```
+Theoretically, we are dealing with count data, so perhaps something other than a
+Gaussian model (Binomial, Poisson GLM?)  would perform better, but we don't see
+any strong deviations (here) from normality. That's not unreasonable since the
+binomial distribution for high counts converges on a normal distribution.
+
+## Date of First Frosts
+```{r}
+firstfrosts.lm <- lm(doy.first ~ year, data = frosts)
+summary(firstfrosts.lm)
+```
+Slightly more than half of the trend in length of growing season is due to later 
+first frosts, about 23 days.
+```{r}
+ round(coef(firstfrosts.lm )[2]*80,2)
+```
+```{r}
+oldpar <- par(mfrow=c(2,2))
+plot(firstfrosts.lm)
+par(oldpar)
+```
+
+## Date of Last Spring Frost
+```{r}
+lastfrosts.lm <- lm(doy.last ~ year, data = frosts)
+summary(lastfrosts.lm)
+```
+
+So last frosts have moved just over two weeks earlier over eighty years:
+```{r}
+round(coef(lastfrosts.lm)[2]*80,2)
+```
+
+# Robust alternatives to Gaussian Models
+The corresponding Thiel-Sen estimators are similar.  Here we use the 'mblm'
+or "Median Based Linear Models" functions from the mblm package.  This fits a
+Theil-Sen estimator, which is a more robust version of fitting a linear trend.
+I also run a Kendal's Tau test, which is (roughly) a test that checks if the
+Theil-Sen estimator is statistically significant.
+```{r}
+ffdays.ts <- mblm(frostfree~ year, dataframe = frosts)
+summary(ffdays.ts)
+cor.test(~frostfree+year, data = frosts, method = 'kendall')
+```
+
+```{r}
+firstfrosts.ts <- mblm(doy.first ~ year, dataframe = frosts)
+summary(firstfrosts.ts)
+cor.test(~doy.first+year, data = frosts, method = 'kendall')
+```
+
+```{r}
+lastfrosts.ts <- mblm(doy.last ~ year, dataframe = frosts)
+summary(lastfrosts.ts)
+cor.test(~doy.last+year, data = frosts, method = 'kendall')
+```

@@ -1,26 +1,32 @@
 ---
 title: "Analysis of Portland Jetport Historical Weather Data"
-output: html_notebook
+author:  "Curtis C. Bohlen, Casco Bay Estuary Partnership"
+date: "11/09/2021"
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
 ---
+
+<img
+  src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+  style="position:absolute;top:10px;right:50px;" />
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center',
+                      fig.width = 5, fig.height = 4,
+                      collapse = TRUE, comment = "#>")
+```
 
 # Install Libraries
 ```{r}
 library(tidyverse)
 library(readr)
-library(ggthemes)
-library(extrafont)
-```
 
-# Set Graphic Defaults
-This code block calls a script that establishes defaults for a consistent Casco Bay State of the Bay graphics look and feel.  It establishes cbep_colors, cbep_colors2, and theme_cbep, after loading selected fonts.  IF you do not run this code, you will need to define those names somewhere else, or remove references to them in the remaintder of the code.
-```{r}
-sibfldnm <- 'Graphics'
-parent <- dirname(getwd())
-sibling <- paste(parent,sibfldnm, sep = '/')
-fn <- 'CBEPGraphicsSetup.R'
-
-source(paste(sibling,fn, sep = '/'))
-rm(sibfldnm, parent, sibling, fn)
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
 ```
 
 # Read Data
@@ -36,11 +42,13 @@ longannualdata <- read_csv(paste(sibling,fn, sep = '/')) %>%
   mutate(cyear = year-1980)
 ```
 
-Making sense of that data requires looking at the metadata, but here's a list of the datatypes included.
+Making sense of that data requires looking at the metadata, but here's a list of 
+the datatypes included.
 ```{r}
 levels(factor(longannualdata$datatype))
 ```
-And their frequencies.  Most data records are available for all years,  A handful, mostly wind related, are inly available more recently.
+And their frequencies.  Most data records are available for all years,  A 
+handful, mostly wind related, are inly available more recently.
 ```{r}
 longannualdata %>%
   group_by(datatype) %>%
@@ -49,14 +57,16 @@ longannualdata %>%
 
 # Annual Minimum, Maximum and Average Temperature
 Codes for Key Temperature records in the downloaded annual data are:
-TAVG  -- Annual Average Temperature (unweighted; effectively average of monthly 
-averages, of daily maxes and mins.  Note that this means this is not independent 
-of the other two metrics.)
-EMXT  -- Extreme Maximum Annual Temperature
-EMNT  -- Extreme Minimum Temperature
+*  TAVG  -- Annual Average Temperature (unweighted; effectively average of 
+   monthly averages, of daily maxes and mins.  Note that this means this is not 
+   independent of the other two metrics.)
+*  EMXT  -- Extreme Maximum Annual Temperature
+*  EMNT  -- Extreme Minimum Temperature
 
 Note that in 2015 State of the Bay, we calculated our own annual means, mins and 
 maxes from the daily records.
+
+## Initial Plot
 ```{r}
 tdata <- longannualdata %>%
   filter(datatype %in% c('TAVG', 'EMXT', 'EMNT')) %>%
@@ -66,12 +76,12 @@ plt <- ggplot(tdata, aes(year, value, color=datatype)) + geom_line(size=1) +
   xlab('Year') +
   theme_cbep() +
   ylab (expression('Temperature ('*~degree*F*')')) +
-  scale_color_manual(values =cbep_colors2, name = '', labels = c('Minimum', 'Maximum', 'Mean'))
+  scale_color_manual(values = cbep_colors2(), name = '', 
+                     labels = c('Minimum', 'Maximum', 'Mean'))
 plt
 ```
-It's even uglier with the default cbep_colors.  Or perhaps we should reverese those colors and use yellow, green, midblue?
 
-## Test Linear Relationships
+## Linear Trends
 ```{r}
 tdataF <- longannualdata %>%
   filter(datatype %in% c('TAVG', 'EMXT', 'EMNT')) %>%
@@ -80,141 +90,44 @@ tdataF <- longannualdata %>%
 mean.lm <- lm(TAVG~ cyear, data = tdataF)
 min.lm <- lm(EMNT~ cyear, data = tdataF)
 max.lm <- lm(EMXT~ cyear, data = tdataF)
+```
 
+### Trend in "mean" Temperature
+Remember the mean temperature is based on means of maximums and minimums, in part.
+```{r}
 summary(mean.lm)
 ```
-So, mean annual temperature has increased about 0.037 degrees F per year, or about one degree C every twenty seven years. (Note thast this "average" may not be what we woulnd normally consider an average -- I believe it's the average of daily aversges of maximum and minimum temperatures.)
+So, mean annual temperature has increased about 0.037 degrees F per year, or
+about one degree C every twenty seven years. (Note thast this "average" may not
+be what we woulnd normally consider an average -- I believe it's the average of
+daily aversges of maximum and minimum temperatures.)
 
+### Trend in Minimum Temperature
 ```{r}
 summary(min.lm)
 ```
-Minimum temperatures have increased substantially faster, climbing 0.1338 degrees per year, or climinag about one degree F every seven years.
+Minimum temperatures have increased substantially faster, climbing 0.1338 
+degrees per year, or climinag about one degree F every seven years.
 ```{r}
+oldpar <- par(mfrow=c(2,2))
 plot(min.lm)
+par(oldpar)
 ```
-No terrible violations of assumptions there.  The tails are slightly kight, but not unacceptably so.
+No terrible violations of assumptions there.
 
+### Trend in Maximum Temperature
 ```{r}
 summary(max.lm)
 ```
 Maximum temperatures continue to not show a long term trend.
 
-```{r}
-plt +
-  geom_abline(slope = mean.lm$coef[2], intercept = mean.lm$coef[1] - 1980 *mean.lm$coef[2], lty = 2, alpha = 0.5) +
-  geom_abline(slope = min.lm$coef[2], intercept = min.lm$coef[1] - 1980 *min.lm$coef[2], lty = 2, alpha = 0.5)
-```
-That graphic is not very satisfying, as the slopes are difficult to perceive.  I wonder if it might be better to present these as temperature anomolies, either from a designated year or from the long term averages.
-
-```{r}
-tdata.centered <- longannualdata %>%
-  filter(datatype %in% c('TAVG', 'EMXT', 'EMNT')) %>%
-  select(-attributes) %>%
-  spread(key = datatype, value = value) %>%
-  mutate_at(c('TAVG', 'EMXT', 'EMNT'), ~ scale(., scale = FALSE)) %>%
-  gather(key = 'datatype', value = 'value', -date, -year, -cyear)
-
-plt <- ggplot(tdata.centered, aes(year, value, color=datatype)) + geom_line() +
-  theme_cbep() +
-  xlab('Year') +
-  ylab('Temperature Anomoly (C)') +
-  scale_color_manual(values=cbep_colors2, name = '', labels = c('Minimum', 'Maximum', 'Mean'))
-plt + geom_smooth(lty = 2, method = 'lm', se = FALSE) 
-```
-geom_smooth() provides a linear model, which is not robust to outliers.  It looks like we have only one major outlier, that very cold winter in about 1943.  Also, I really don't want the non statistically significant slope on maximum temperature to show.
-
-So, lets fit linear models and add statistically significant ones to the plot
-```{r}
-tdata.centered.wide <- tdata.centered %>%
-  spread(key = datatype, value = value)
-mean.lm <- lm(TAVG~ cyear, data = tdata.centered.wide)
-min.lm <- lm(EMNT~ cyear, data = tdata.centered.wide)
-max.lm <- lm(EMXT~ cyear, data = tdata.centered.wide)
-```
-
-Statistical significance of slope estimates should not change based on centering, so we don't need to review model results.  What should change here is simply the paramaterization -- especially the value of the intercepts.  Code here also relabels the x axis to show years, not "centered years." 
-
-```{r}
-plt +
-  geom_abline(slope = mean.lm$coef[2], intercept = mean.lm$coef[1] - 1980 *mean.lm$coef[2], lty = 2, alpha = 0.5) +
-  geom_abline(slope = min.lm$coef[2], intercept = min.lm$coef[1] - 1980 *min.lm$coef[2], lty = 2, alpha = 0.5) +
-  scale_color_manual(values=cbep_colors2, name = '', labels = c('Minimum', 'Maximum', 'Mean'))
-```
-
-Can also fill in anomolies with different colors, as follows.  ()
-```{r}
-type.labs <- c('Maximum', 'Average', 'Minimum')
-names(type.labs) <- c("EMXT", "TAVG", "EMNT")
-
-
-plt1 <- ggplot(tdata.centered, aes(year, value)) + 
-  geom_bar(aes(fill = ifelse(value <0, "red4", "blue")),stat = "identity",
-                                                                 position = "identity") +
-  theme_cbep() +
-  ggplot2::scale_fill_discrete(name = '', labels = c('Above Average', 'Below Average')) +
-  xlab('Year') +
-  ylab('Temperature Anomoly (F)') +
-  facet_wrap('datatype', nrow=3, scales = 'fixed', # alternative is "free_y"
-             labeller = labeller(datatype = type.labs),
-             strip.position = 'right') +
-  theme(legend.position = "none")
-plt1
-```
-
-
-```{r}
-plt2 <- ggplot(tdata.centered, aes(year, value)) + 
-  geom_bar(aes(fill = ifelse(value <0, "Below Average", "Above Average")),stat = "identity",
-                                                                 position = "identity") +
-  theme_cbep() +
-  scale_fill_discrete(name = '', labels = c('Above Average', 'Below Average')) +
-  xlab('Year') +
-  ylab('Temperature Anomoly (F)') +
-  facet_wrap('datatype', nrow=3, scales = 'free_y', # alternative is "fixed"
-             labeller = labeller(datatype = type.labs),
-             strip.position = 'right') +
-  theme(legend.position = "none")
-plt2
-```
-
-```{r}
-
-lines <- tibble(datatype = c("EMXT", "TAVG", "EMNT"),
-               theslope = c(max.lm$coef[2], mean.lm$coef[2], min.lm$coef[2]),
-               theintercept = c(max.lm$coef[1] - 1980 *max.lm$coef[2],
-                                mean.lm$coef[1] - 1980 *mean.lm$coef[2],
-                                min.lm$coef[1] - 1980 *min.lm$coef[2]))
-
-labs <-  tibble(datatype = c("EMXT", "TAVG", "EMNT"),
-              ypos1 = c(-4, -8, -4),
-              ypos2 = c(-2, -1.5, -5),
-              xpos = c(1950, 2000, 2000),
-              txt = c("Not Significant",
-                       paste(round(mean.lm$coef[2]*10,2), 'degree F', "per decade"),
-                       paste(round(min.lm$coef[2]*10,2), 'degree ', "per decade"))
-)
-```
-
-```{r}
-
-plt1 +
-  geom_abline(aes(slope = theslope, intercept = theintercept), data = lines, lty = 2, alpha = 0.75) +
-  geom_text(aes(x=xpos, y=ypos1, label=txt), data = labs)
-
-```
-
-```{r}
-plt2 +
-  geom_abline(aes(slope = theslope, intercept = theintercept), data = lines, lty = 2) +
-  geom_text(aes(x=xpos, y=ypos2, label=txt), data = labs)
-ggsave('drafttempanomolies.png')
-```
-Not clear which is better....
-Note that in 2015 State of the Bay, we calculated our own annual means, mins and maxes from the daily records.
-
 #  Precipitation Totals
-13.PRCP:  Total Monthly (Annual) precipitation. Precipitation totals are based on daily or multi-day (if daily is missing) precipitation report, in millimeters to tenths.
+13.PRCP:  Total Monthly (Annual) precipitation. Precipitation totals are based 
+on daily or multi-day (if daily is missing) precipitation report, in millimeters 
+to tenths.
+
 18.SNOW Total Monthly (Annual) Snowfall in millimeters.
+
 ```{r}
 pdatalong <- longannualdata %>%
   filter(datatype %in% c('PRCP', 'SNOW')) %>%
@@ -226,52 +139,37 @@ pdata <- longannualdata %>%
   mutate(datatype = factor(datatype)) %>%
   mutate(value = value*0.0394) %>%
   spread(key=datatype, value=value)
-
-plt <- ggplot(pdatalong, aes(year, value, color=datatype)) + 
-  geom_point(size=2) +
-  xlab('Year') +
-  theme_cbep() +
-  ylab('Precipitation (inches)') +
-  scale_color_manual(values=cbep_colors, name = '', labels = c('Precipitation', 'Snow')) +
-  ylim(c(0,150))
-plt + geom_smooth(method='lm', se=FALSE, lty=2) 
 ```
-They don't work well on one plot.
+
+## Linear Models
+### Total Annual Snowfal
 ```{r}
 snow.lm <- lm(SNOW~year, data = pdata)
 summary(snow.lm)
 ```
 
 ```{r}
+oldpar <- par(mfrow=c(2,2))
+plot(snow.lm)
+par(oldpar)
+```
+
+### Total Annual Precipitation
+```{r}
 precip.lm <- lm(PRCP~year, data = pdata)
 summary(precip.lm)
 ```
-So, Precipitation is increasing by about 1 inch every 7 years, or close to a 10 inch increase in annual average rainfall since 1940.
-Lets make aplot that 
-
 
 ```{r}
-lines <- tibble(yr=seq(1941,2019), prcp= precip.lm$coef[1] + precip.lm$coef[2]*seq(1941,2019))
-plt + geom_line(data = lines, aes(x=yr, y=prcp), lty=2, color=cbep_colors[1])
-ggsave('draftprecipsnow.png')
+oldpar <- par(mfrow=c(2,2))
+plot(precip.lm)
+par(oldpar)
 ```
 
+So, Precipitation is increasing by about 1 inch every 7 years, or close to a 
+10 inch increase in annual average rainfall since 1940.
 
-
-```{r}
-plt <- ggplot(pdata, aes(year, PRCP)) + 
-  geom_point(size=2) +
-  geom_smooth(method='lm', se=FALSE, lty=2) +
-  xlab('Year') +
-  theme_cbep() +
-  ylab('Precipitation (inches)') +
-  ylim(c(0,80))
-plt
-ggsave('draftprecip.png')
-```
-
-It's worth also wondering if the variance in rainfall has increased in any meaningful way, but that appears unlikly eyeballing the  data.  For that we'd need to look at some definition of drought based on monthly or daily precipitation totals. 
-
-
-11.EMSD:  Highest daily Snow Depth in the month (year) in millimeters.
-
+It's worth also wondering if the variance in rainfall has increased in any
+meaningful way, but that appears unlikly eyeballing the  data.  For that we'd
+need to look at some definition of drought based on monthly or daily
+precipitation totals.
