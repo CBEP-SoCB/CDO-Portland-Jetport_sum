@@ -1,0 +1,210 @@
+---
+title: "Revised Graphics of Portland Jetport Historical Weather Data"
+author: "Curtis C. Bohlen, Casco Bay Estuary Partnership."
+date: "02/01/2021"
+output:
+  github_document:
+    toc: true
+    fig_width: 5
+    fig_height: 4
+---
+<img
+    src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+    style="position:absolute;top:10px;right:50px;" />
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = 'center',
+                      fig.width = 5, fig.height = 4,
+                      collapse = TRUE, comment = "#>")
+```
+
+
+# Introduction
+This is a revision to draft R Notebooks preparing earlier versions of graphics. It includes only code used in the last round of design and redesign decisions.  A more complete collection of draft graphics are in "max, min and averages.Rmd"
+
+# Install Libraries
+```{r install_libraries}
+library(tidyverse)
+library(readr)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
+```
+
+# Load Data
+```{r load_data}
+sibfldnm <- 'Original_Data'
+parent <- dirname(getwd())
+sibling <- file.path(parent,sibfldnm)
+fn <- 'longannualdata.csv'
+
+longannualdata <- read_csv(file.path(sibling, fn)) %>%
+  select(-station) %>%
+  mutate(year = as.numeric(format(date, format = '%Y'))) %>%
+  mutate(cyear = year - 1980)
+```
+
+# Annual Minimum and Average Temperature
+Codes for key temperature records in the downloaded annual data are:
+TAVG  -- Annual Average Temperature (unweighted; effectively average of monthly averages, of daily maxes and mins.  Note that this means this is not independent of the other two metrics.)
+EMXT  -- Extreme Maximum Annual Temperature
+EMNT  -- Extreme Minimum Temperature
+
+```{r data_reorganization_1}
+tdata <- longannualdata %>%
+  filter(datatype %in% c('TAVG', 'EMNT')) %>%
+  mutate(value = value*(9/5)+32) %>%
+  mutate(datatype = factor(datatype, levels = c('TAVG', 'EMNT' )))
+```
+
+```{r data_reorganization_2}
+tdata.centered <- longannualdata %>%
+  filter(datatype %in% c('TAVG', 'EMNT')) %>%
+  mutate(value = value*(9/5)+32) %>%
+  select(-attributes) %>%
+  pivot_wider(names_from = datatype, values_from = value) %>%
+  mutate_at(c('TAVG', 'EMNT'), ~ scale(., scale = FALSE)) %>%
+  pivot_longer(c( -date, -year, -cyear), names_to = 'datatype', values_to = 'value') %>%
+  mutate(datatype = factor(datatype, levels = c('EMXT', 'TAVG', 'EMNT' ))) 
+
+tdata.centered.wide <- tdata.centered %>%
+  spread(key = datatype, value = value)
+
+mean.lm.2 <- lm(TAVG ~ cyear, data = tdata.centered.wide)
+min.lm.2  <- lm(EMNT ~ cyear, data = tdata.centered.wide)
+```
+
+
+## Create Labels
+Note the way we assemble a mathematical expression to be interpreted by "plotmath" for the annotations.  The key idea is that you need to link each symbol or word either with "~" if you want a space, or "*" if you don't.
+
+```{r annotation_dataframe}
+labs <-  tibble(datatype = c("TAVG", "EMNT"),
+              ypos1 = c(55, 10),
+              xpos = c(2000, 2000),
+              txt = c( paste(round(mean.lm.2$coef[2]*10,2), '~degree*F', "~per~decade"),
+                       paste(round(min.lm.2$coef[2]*10,2), '~degree*F', "~per~decade")) ) %>%
+  mutate(datatype = factor(datatype, levels = c('TAVG', 'EMNT' ))) 
+```
+
+## Temperature Exceedences Plot
+### Basic Plot
+```{r temperature_plot, fig.width = 2.5, fig.height = 1.75}
+plt <- ggplot(tdata, aes(year, value)) + 
+  
+  geom_point(color = 'gray85', size = 1) +
+  geom_smooth(aes(color=datatype), method = 'lm', 
+              formula = y~x, se = FALSE, lwd = 0.5) +
+  
+  xlab('Year') +
+  ylab (expression('Temperature ('*~degree*F*')')) +
+  
+  scale_color_manual(values = cbep_colors2(),
+                     name = 'Annual Values',
+                     labels = c('Maximum', 'Average', 'Minimum')) +
+
+  scale_y_continuous(breaks = seq(-25 , 100, 25)) +
+ 
+  theme_cbep(base_size = 9) +
+  
+  theme(legend.position= 'none') +
+  theme(panel.grid.major.y = element_line(size = 0.5, 
+                                          color = 'gray', 
+                                          linetype = 3)) # +
+
+plt
+
+ggsave('avgmin.pdf', device = cairo_pdf, width = 2.5,height = 1.75)
+```
+
+### Plot With No Labels
+```{r temperature_plot_bare, fig.width = 2.25, fig.height = 1.5}
+plt <- ggplot(tdata, aes(year, value)) + 
+  
+  geom_point(color = 'gray85', size = 1) +
+  geom_smooth(aes(color=datatype), method = 'lm', 
+              formula = y~x, se = FALSE, lwd = 0.5) +
+  
+  xlab('Year') +
+  ylab (expression('Temperature ('*~degree*F*')')) +
+  
+  scale_color_manual(values = cbep_colors2(),
+                     name = 'Annual Values',
+                     labels = c('Maximum', 'Average', 'Minimum')) +
+
+  scale_y_continuous(breaks = seq(-25 , 100, 25)) +
+ 
+  theme_cbep(base_size = 9) +
+  
+   theme(legend.position= 'none',
+        axis.text = element_blank(),
+        axis.title = element_blank()) +
+  xlab('') +
+  ylab('') +
+  
+  theme(panel.grid.major.y = element_line(size = 0.5, 
+                                          color = 'gray', 
+                                          linetype = 3)) 
+
+plt
+
+ggsave('avgmin_bare.pdf', device = cairo_pdf, width = 2.25,height = 1.5)
+```
+
+# Precipitation Totals
+Codes for key annual PRECIPITATION records in the downloaded data are:
+PRCP:  Total Monthly (Annual) precipitation. Precipitation totals are based on daily or multi-day (if daily is missing) precipitation report, in millimeters to tenths.
+SNOW:  Total Monthly (Annual) Snowfall in millimeters.
+
+## Read Data and Transform to English Units.
+```{r data_reorganization_3}
+pdata <- longannualdata %>%
+  filter(datatype %in% c('PRCP')) %>%
+  mutate(PRCP = value * 0.0394)
+
+precip.lm <- lm(PRCP ~ year, data = pdata)
+```
+
+## Precipitation Plot
+### Basic Plot
+```{r precipitation_plot, fig.width = 2.5, fig.height = 2.5}
+plt <- ggplot(pdata, aes(year, PRCP)) + 
+  geom_point(color = 'gray85', size = 1) +
+  geom_smooth(method='lm', se = FALSE, lty = 1, color = cbep_colors()[5]) +
+  
+  theme_cbep(base_size = 9) +
+  
+  theme(legend.position= 'none') +
+  xlab('') +
+  
+  ylab('Precipitation (inches)') +
+  ylim(0,70)
+  
+plt
+
+ggsave('small_precip.pdf', device = cairo_pdf, width = 2.25, height = 2.25)
+```
+
+### Plot with no Labels
+```{r precipitation_plot_bare, fig.width = 2, fig.height = 2}
+plt <- ggplot(pdata, aes(year, PRCP)) + 
+  geom_point(color = 'gray85', size = 1) +
+  geom_smooth(method='lm', se = FALSE, lty = 1, color = cbep_colors()[5]) +
+  
+  theme_cbep(base_size = 9) +
+  
+  theme(legend.position= 'none',
+        axis.text = element_blank(),
+        axis.title = element_blank()) +
+  xlab('') +
+  ylab('') +
+  ylim(0,70)
+
+plt
+
+ggsave('small_precip_bare.pdf', device = cairo_pdf, width = 2.0, height = 2.0)
+
+```
+
+

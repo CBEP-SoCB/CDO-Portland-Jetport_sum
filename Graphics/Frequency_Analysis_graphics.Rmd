@@ -1,0 +1,342 @@
+---
+title: "Frequency Analyses of Weather Events"
+output: html_notebook
+---
+
+# Install Libraries
+```{r}
+library(tidyverse)
+library(readr)
+library(svglite)
+
+library(CBEPgraphics)
+```
+
+
+# Temperature Exeedences
+## Read Data
+The Annual Data Downloaded from NOAA's Climate Data Online includes counts of the number of days exceeding various temperature thresholds, as follows:
+
+DX90: Number of days with maximum temperature >= 32.2°C/90°F.
+DX70: Number of days with maximum temperature >= 21.1°C/70°F.
+DX32: Number of days with maximum temperature <= 0°C/32°F.
+DT32: Number of days with minimum temperature <= 0°C/32°F.
+DT00: Number of days with minimum temperature <= -17.8°C/0°F.
+```{r}
+sibfldnm <- 'Original Data'
+parent <- dirname(getwd())
+sibling <- paste(parent,sibfldnm, sep = '/')
+fn <- 'longannualdata.csv'
+
+longannualdata <- read_csv(paste(sibling,fn, sep = '/')) %>%
+  select(-station) %>%
+  mutate(year = as.numeric(format(date, format='%Y'))) %>%
+  mutate(cyear = year-1980)
+```
+We focus on days that got over over 90 Fahrenheit, days that dropped  below 32, and days  that got as low as 0 degrees F.  Notice that even though the CDO data was downloaded in metric units, these cumulative counts are based on English units.
+```{r}
+textdatalong <- longannualdata %>%
+  filter(datatype %in% c('DX90', 'DT32', 'DT00'))
+
+textdata <- longannualdata %>%
+  filter(datatype %in% c('DX90', 'DT32', 'DT00')) %>%
+  spread(key = datatype, value = value)
+
+# The following is to test binomial GLMs
+doy <- tibble(year = 1941:2019, days = rep(365, 2020-1941)) %>%
+mutate(days = ifelse((year %% 4 == 0) & (year!=2000), 366, 365))
+
+textdata <- textdata %>%
+  mutate(days = doy$days)
+```
+
+### Poisson Models
+Note that while I prefer the quasi-Poisson models for inferrence, the predictions of the the Poisson models are identical. They differ only in dispersion.  Fo plotting purposes, since I don't show model dispersion on the plots, the two are functionally identical.
+```{r}
+gt90GLM <- glm(DX90 ~ year, family = poisson, data = textdata)
+lt32GLM <- glm(DT32 ~ year, family = poisson, data = textdata)
+lt00GLM <- glm(DT00 ~ year, family = poisson, data = textdata)
+```
+
+### Decadal Predictions of days with warm or cold weather
+Mostly we want these predictions to pull out "typical" values from the 1940s and the 2010s in subsequent plots.
+```{r}
+newdf <- data.frame(year=c(1945, 1955, 1965, 1975, 1985, 1995, 2005, 2015))
+gt90pred <- predict(gt90GLM, newdata=newdf, type='response')
+lt32pred <- predict(lt32GLM, newdata=newdf, type='response')
+lt00pred <- predict(lt00GLM, newdata=newdf, type='response')
+(df <- tibble(year = newdf$year, 
+                 gt90 =gt90pred,
+                 lt32=lt32pred,
+                 lt00 =lt00pred  ))
+```
+
+So, assemble a dataframe containing the annotations.
+```{r}
+labs<-tibble(year=rep(c(1940, 2000),3),
+             y = c(45,25,140, 125, -5,-5),
+             txt= c(paste('About', round(df$lt00[1],0), 'per year'),
+                    paste('About', round(df$lt00[8],0), 'per year'),
+                    paste('About', round(df$lt32[1],0), 'per year'),
+                    paste('About', round(df$lt32[8],0), 'per year'),
+                    paste('No trend'),
+                    paste(''))             
+             
+             )
+```
+
+my.labs <- list(bquote(alpha==.(value)),bquote(beta==.(value)))
+
+# Plotting
+Putting all three temperature records on one chart tends to look too busy, but here it is anyway.
+```{r fig.width = 7, fig.height = 5}
+textdata <- longannualdata %>%
+  filter(datatype %in% c('DT32', 'DT00', 'DX90'))
+
+lines <- tibble(yr = seq(1940,2020),
+                lt32 = exp(coef(lt32GLM)[1] + coef(lt32GLM)[2]  * seq(1940,2020) ),
+                lt00 = exp(coef(lt00GLM)[1] + coef(lt00GLM)[2]  * seq(1940,2020) ),
+                gt90 = exp(coef(gt90GLM)[1] + coef(gt90GLM)[2]  * seq(1940,2020) ) )
+
+
+plt <- ggplot(textdata, aes(x=year))+
+  geom_line(aes(y=value, color=datatype)) +
+  geom_line(data = lines, aes(x=yr, y=lt32), lty=2, color=cbep_colors[2]) +
+  geom_line(data = lines, aes(x=yr, y=lt00), lty=2, color=cbep_colors[1]) +
+  geom_line(data = lines, aes(x=yr, y=gt90), lty=2, color=cbep_colors[3]) +
+  geom_text(aes(x=year, y=y, label=txt), data = labs, hjust=0) +
+  
+  #theme_cbep() +
+  theme(legend.position=c(.75,.5)) +
+  xlab('Year') +
+  ylab("Days per Year") +
+  scale_color_manual(values = cbep_colors, name = '',
+                     labels = c('Below Zero', 'Below Freezing', parse(text='Above~90*degree*F')),
+                     guide = guide_legend(parse = TRUE))
+plt
+ggsave('draftfrequencycold.png', width = 7, height = 5,  type = 'cairo')
+ggsave('draftfrequencycold.pdf', 
+        device=cairo_pdf, width = 7, height = 5)
+```
+
+
+That puts two similar colors near each other.  Lets try dots and different color assignments.
+```{r fig.width = 7, fig.height = 5}
+textdata <- textdata %>%
+  mutate(datatype = factor(datatype, levels = c('DT00', 'DX90', 'DT32')))
+
+
+plt <- ggplot(textdata, aes(x=year))+
+  geom_point(aes(y=value, color=datatype)) +
+  geom_line(data = lines, aes(x=yr, y=lt32), lty=1, color=cbep_colors[3]) +
+  geom_line(data = lines, aes(x=yr, y=lt00), lty=1, color=cbep_colors[1]) +
+  geom_line(data = lines, aes(x=yr, y=gt90), lty=1, color=cbep_colors[2]) +
+  geom_text(aes(x=year, y=y, label=txt), data = labs, hjust=0) +
+  
+  theme(legend.position=c(.75,.5)) +
+  xlab('Year') +
+  ylab("Days per Year") +
+  scale_color_manual(values = cbep_colors, name = '',
+                     labels = c('Below Zero', parse(text='Above~90*degree*F'),'Below Freezing' ),
+                     guide = guide_legend(parse = TRUE))
+plt
+ggsave('draftfrequencycolddots.png', width = 7, height = 5, type = 'cairo')
+ggsave('draftfrequencycolddots.pdf',
+       device=cairo_pdf, width = 7, height = 5)
+```
+
+
+
+# Precipitation Frequencies
+6. DP01: Number of days with >= 0.01 inch/0.254 millimeter in the month (year).
+7. DP10: Number of days with >= 0.1 inch/2.54 millimeter in the month (year).
+8. DP1X: Number of days with >= 1.0 inch (25.4mm) precipitation in the month (year).
+9.DSNW: Number of days with snowfall >= 1 inch (25 mm).
+10.DSND: Number of days with snow depth >= 1 inch (25 mm).
+
+Note this does not include the number of days with more than two inches of rain, which is arguably a better metric of intense storms than the one inch rain threshold.  That needs to be derived from the daily data, as I doi here.
+## Load Data
+```{r}
+pextdata <- longannualdata %>%
+  filter(datatype %in% c('DP01', 'DP1X', 'DSNW', 'DSND')) %>%
+  select(-attributes) %>%
+  spread(key = datatype, value = value)
+
+# Days with two inches of rain or more
+sibfldnm <- 'Original Data'
+parent <- dirname(getwd())
+sibling <- paste(parent,sibfldnm, sep = '/')
+fn <- 'longdailydata.csv'
+
+num2inch <- 
+  # Read daily data
+  read_csv(paste(sibling,fn, sep = '/')) %>%
+  select(-station) %>%
+  mutate(year = as.numeric(format(date, format='%Y')))  %>%
+  select(date,year, datatype, value) %>%
+  # Filter down to only precipitation data
+  filter(datatype=='PRCP') %>%
+  rename(PRCP = value) %>%
+  filter( ! is.na(PRCP)) %>%
+  # Convert to inches. Original data in tenths of mm
+  mutate(PRCP_IN = PRCP * 0.0393700787 / 10) %>% 
+  filter(year > 1940) %>%       # 1940 is an incomplete year in the daily data
+  
+  # And count the number of high rain events
+  filter(PRCP_IN >= 2) %>%    # Only days with two inches of rain or more
+  group_by(year) %>%
+  summarise(COUNT = n())      # use all caps because "count" is a bultin function
+```
+
+
+So far, this will be wrong for years that have no large storms, since the Year will  get dropped.  We want years with zero intense storms to be included in the data with the value of zero.  One can fix that using a left_join.
+```{r}
+pextdata <- left_join(pextdata, num2inch, by='year') %>%
+  mutate(COUNT=replace_na(COUNT,0)) %>%
+  rename(DP2X = COUNT) %>%
+  mutate(cyear = year-1980)
+
+pextdatalong <- pextdata %>%
+  gather(key='datatype', value = 'value', -date, -year, -cyear)
+
+rm(sibfldnm, parent, sibling, fn, num2inch)
+```
+
+## Poisson Models
+```{r}
+gt0GLM <- glm(DP01 ~ year, family = poisson, data = pextdata)
+gt1GLM <- glm(DP1X ~ year, family = poisson, data = pextdata)
+gt2GLM <- glm(DP2X ~ year, family = poisson, data = pextdata)
+
+
+gt0GLM_q <- glm(DP01 ~ year, family = quasipoisson, data = pextdata)
+gt1GLM_q <- glm(DP1X ~ year, family = quasipoisson, data = pextdata)
+gt2GLM_q <- glm(DP2X ~ year, family = quasipoisson, data = pextdata)
+```
+
+
+## Net Changes
+We need to calculate a few summary estimates to include in the graphics.  The following two blocks of code  gives us a gauge of "typical" conditions for each decade, based on all the available data, not just the data from that decade.
+
+### Decadal Predictions of days with greater than one inch of rainfall
+```{r}
+newdf <- data.frame(year=c(1945, 1955, 1965, 1975, 1985, 1995, 2005, 2015))
+pred <- predict(gt1GLM, newdata=newdf, type='response')
+(gt1df <- tibble(year = newdf$year, p = pred))
+
+```
+So, days with more than one inch of rain  have gone from about eight a year in the 1940s to about thirteen a year in the 2010s.
+
+### Decadal Predictions of days with greater than two inches of rainfall
+```{r}
+pred <- predict(gt2GLM, newdata=newdf, type='response')
+(gt2df <- tibble(year = newdf$year, p = pred))
+```
+Days with two or more inches of rain have gone from about one a year to about three a year.
+
+## Plot Days with Heavy Rainfall
+
+```{r fig.width = 7, fig.height = 5}
+
+lines <- tibble(yr = seq(1940,2020),
+                gt1 = exp(coef(gt1GLM)[1] + coef(gt1GLM)[2]  * seq(1940,2020) ),
+                gt2 = exp(coef(gt2GLM)[1] + coef(gt2GLM)[2]  * seq(1940,2020) ) )
+
+plt <- pextdatalong %>%
+  filter(datatype %in% c('DP1X', 'DP2X')) %>%
+  
+  ggplot(aes(x=year))+
+  geom_line(aes(y=value, color=datatype)) +
+  geom_line(data = lines, aes(x=yr, y=gt1), lty=2, color=cbep_colors[1]) +
+  geom_line(data = lines, aes(x=yr, y=gt2), lty=2, color=cbep_colors[2]) +
+  
+  xlab('Year') +
+  ylab("Days per Year") +
+  scale_color_manual(values = cbep_colors, name = '',
+                      labels = c('> 1 inch Precip.', 
+                                 '>2 inch Precip.')) +
+  theme(legend.position = c(.15, .9))
+plt
+
+ggsave('drafthighrainfalldayslines.png', width = 7, height = 5, type = 'cairo')
+#ggsave('drafthighrainfalldayslines.svg', width = 7, height = 5)
+ggsave('drafthighrainfalldayslines.pdf',
+       device=cairo_pdf, width = 7, height = 5)
+```
+
+```{r fig.width = 7, fig.height = 5}
+lines <- tibble(yr = seq(1940,2020),
+                gt1 = exp(coef(gt1GLM)[1] + coef(gt1GLM)[2]  * seq(1940,2020) ),
+                gt2 = exp(coef(gt2GLM)[1] + coef(gt2GLM)[2]  * seq(1940,2020) ) )
+
+labs<-tibble(year=c(1945, 2015, 1945,2015),
+             y = c(10,17,-0.5,2),
+             txt= c(paste('~', round(gt1df$p[1],0), 'per year'),
+                    paste('~', round(gt1df$p[8],0), 'per year'),
+                    paste('~', round(gt2df$p[1],0), 'per year'),
+                    paste('~', round(gt2df$p[8],0), 'per year')))
+
+
+plt <- pextdatalong %>%
+  filter(datatype %in% c('DP1X', 'DP2X')) %>%
+  
+  ggplot(aes(x=year))+
+  geom_point(aes(y=value, color=datatype)) +
+  geom_line(data = lines, aes(x=yr, y=gt1), lty=1, color=cbep_colors[1]) +
+  geom_line(data = lines, aes(x=yr, y=gt2), lty=1, color=cbep_colors[2]) +
+  geom_text(aes(x=year, y=y, label=txt), data = labs) +
+  
+  xlab('Year') +
+  ylab("Days") +
+  scale_color_manual(values = cbep_colors, name = '',
+                      labels = c('> 1 inch Precip.', 
+                                 '>2 inch Precip.')) +
+  theme(legend.position = c(.15, .9))
+plt
+
+ggsave('drafthighrainfalldaysdots.png', width = 7, height = 5,  type = 'cairo')
+ggsave('drafthighrainfalldaysdots.pdf',
+       device=cairo_pdf, width = 7, height = 5)
+```
+
+
+```{r}
+lines <- tibble(yr = seq(1940,2020),
+                gt1 = exp(coef(gt1GLM)[1] + coef(gt1GLM)[2]  * seq(1940,2020) ),
+                gt2 = exp(coef(gt2GLM)[1] + coef(gt2GLM)[2]  * seq(1940,2020) ) )
+
+plt <- pextdatalong %>%
+  filter(datatype %in% c('DP1X')) %>%
+  
+  ggplot(aes(x=year, color=datatype))+
+  geom_point(aes(y=value)) +
+  geom_line(data = lines, aes(x=yr, y=gt1), color = 'black') +
+  
+  xlab('Year') +
+  ylab('Days with > 1 in. Precip.') +
+  scale_color_manual(values = cbep_colors, name = '') +
+  theme(legend.position ='none')
+plt
+#ggsave('draftfrequencyGT1.png')
+```
+
+```{r}
+
+lines <- tibble(yr = seq(1940,2020),
+                gt1 = exp(coef(gt1GLM)[1] + coef(gt1GLM)[2]  * seq(1940,2020) ),
+                gt2 = exp(coef(gt2GLM)[1] + coef(gt2GLM)[2]  * seq(1940,2020) ) )
+
+plt <- pextdatalong %>%
+  filter(datatype %in% c('DP2X')) %>%
+  
+  ggplot(aes(x=year, color=datatype))+
+  geom_point(aes(y=value)) +
+  geom_line(data = lines, aes(x=yr, y=gt2), color='black') +
+  
+  xlab('Year') +
+  ylab("Days with > 2 in. Precip.") +
+  scale_color_manual(values = cbep_colors, name = '') +
+  theme(legend.position ='none')
+plt
+#ggsave('draftfrequencygt2.png')
+```
