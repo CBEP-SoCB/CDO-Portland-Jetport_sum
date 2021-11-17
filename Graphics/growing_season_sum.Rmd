@@ -1,7 +1,7 @@
 ---
-title: "REvised Graphics for Length of Growing Season"
+title: "Graphics for Length of Growing Season"
 author: "Curtis C. Bohlen, Casco Bay Estuary Partnership."
-date: "02/01/2021"
+date: "11/16/2021"
 output:
   github_document:
     toc: true
@@ -18,9 +18,8 @@ knitr::opts_chunk$set(fig.align = 'center',
                       collapse = TRUE, comment = "#>")
 ```
 
-
 # Load Libraries
-```{r}
+```{r libraries}
 library(tidyverse)
 library(readr)
 
@@ -32,13 +31,17 @@ theme_set(theme_cbep())
 # Read Data
 The frost-free period needs to be derived directly from the daily temperature
 data.  Note that temperature in the source data is in tenths of a degree C.
-```{r}
-sibfldnm <- 'Original_Data'
+```{r folders}
+sibfldnm <- 'Data'
 parent <- dirname(getwd())
 sibling <- paste(parent,sibfldnm, sep = '/')
 fn <- 'longdailydata.csv'
 
-longdailydata <- read_csv(paste(sibling,fn, sep = '/')) %>%
+dir.create(file.path(getwd(), 'figures'), showWarnings = FALSE)
+```
+
+```{r load_data}
+longdailydata <- read_csv(file.path(sibling,fn)) %>%
   select(-station) %>%
   filter(datatype %in% c('TMAX', 'TMIN')) %>%
   mutate(doy = as.numeric(format(date, format = '%j'))) %>%
@@ -55,22 +58,22 @@ In brief, we filter a dataframe down to data that meets our criteria -- here,
 days with temperatures below freezing -- and then group_by() to isolate data
 from each year, and finally slice() to pick the first or last item in the list.
 Be aware that this strategy depends on the data being in chronological order.
-```{r}
+```{r find_first_and_last_frost}
 cutoffinF <- 32
 cutoffinC <- (cutoffinF - 32) * 5/9
 
 firstfrosts <- longdailydata %>%
-  spread(key = datatype, value = value) %>%
+  pivot_wider(names_from = datatype, values_from = value) %>%
   filter(year > 1940) %>%               # 1940 is an incomplete year in the daily data
   mutate(TMIN = TMIN/10) %>%            # raw data is in tenths of degree C
-  filter(TMIN <= cutoffinC) %>%          # Only days below freezing
-  filter(month >= 7) %>%                  # only the last half of the year
+  filter(TMIN <= cutoffinC) %>%         # Only days below freezing
+  filter(month >= 7) %>%                # only the last half of the year
   group_by(year) %>%
   slice(1)  %>%                         # Choose the first record
   select(date, year, doy)
 
 lastfrosts <- longdailydata %>%
-  spread(key = datatype, value = value) %>%
+  pivot_wider(names_from = datatype, values_from = value) %>%
   filter(year > 1940) %>%                 # 1940 is an incomplete year in the daily data
   mutate(TMIN = TMIN/10) %>%            # raw data is in tenths of degree C
   filter(TMIN <= cutoffinC) %>%          # Only days below freezing
@@ -87,42 +90,70 @@ rm(firstfrosts,lastfrosts)
 ```
 
 
-# Frost Free Graphics
-## Basic Graphic
+# Frost Free Days
 Note that as all we fit were simple linear models, we can create graphics using
 geom_smooth() with method ='lm'.  We really only need the model to extract net
 change data from model predictions.
-```{r frost_free_plot, fig.width = 2.5, fig.height = 1.75}
+```{r frost_free_plot, fig.width = 5, fig.height = 4}
 plt <- ggplot(frosts, aes(year, frostfree)) + 
   geom_point(color = 'gray85', size = 1) +
   geom_smooth(method = 'lm', se = FALSE, lty=1, lwd = 0.5, color = cbep_colors()[4]) +
-  geom_hline(yintercept = 134, lty = 2, color = 'gray50') +
-  #geom_segment(x = 2010, xend = 2023, y = 168, yend = 168,
-  #             lty = 2, color = 'gray50') +
   ylab('Frost Free Days') +
   xlab('Year') +
-  theme_cbep(base_size = 9)
+  theme_cbep(base_size = 12)
   
 plt
 
-ggsave('small_frostfree.pdf', device=cairo_pdf, width = 2.5, height = 1.75)
+ggsave('figures/frostfree.pdf', device=cairo_pdf, width = 5, height = 45)
 ```
 
-## Graphic With No Labels
-```{r frost_free_plot_bare, fig.width = 2.25, fig.height = 1.5}
-plt <- ggplot(frosts, aes(year, frostfree)) + 
-  geom_point(color = 'gray85', size = 1) +
-  geom_smooth(method = 'lm', se = FALSE, lty=1, lwd = 0.5, color = cbep_colors()[4]) +
-  geom_hline(yintercept = 134, lty = 2, color = 'gray50') +
-  
-  theme_cbep(base_size = 9) +
-  theme(legend.position= 'none',
-        axis.text = element_blank(),
-        axis.title = element_blank()) +
-  xlab('') +
-  ylab('')
-  
-plt
+## Evaluating Net Changes
+```{r net_changes}
+the.lm <- lm(frostfree~year, frosts)
+nd <- tibble(year = c(1945, 2015))
+(p <- round(predict(the.lm, newdata = nd), 0))
+```
 
-ggsave('small_frostfree_bare.pdf', device=cairo_pdf, width = 2.25, height = 1.5)
+Metric         | Value
+---------------|-------------
+Typical, 1940s:| `r p[1]`
+Typical, 2010s:| `p[2]`
+Net Change:    | `r p[2]-p[1]`
+Change Per Decade| `r 10*(p[2]-p[1])/(2015-1945)`
+
+
+```{r add_annotations, fig.width = 7, fig.height = 5}
+labs = tibble(x = c(1940, 2005),
+              y = c(143,178),
+              txt = c(paste('~', p[1], 'Days'),
+                      paste('~', p[2], 'Days')))
+
+plt + geom_text(aes(x = x, y = y, label = txt), data = labs, hjust = 0)
+
+ggsave('figures/FrostFree.pdf', width = 7, height = 5, device = cairo_pdf)
+```
+
+
+# First and Last Frost Dates 
+```{r reorg_frosts_data}
+tmp <- frosts %>%
+  select(-doy.first, -doy.last, -frostfree) %>%
+  gather(key = 'indicator', value = 'date', -year) %>%
+  mutate(month = format(date, format = '%m')) %>%
+  mutate(day = format(date, format = '%d' )) %>%
+  mutate(day = ifelse(day == '29' & month == '02', '28', day)) %>%   # Check for unlikely event of leap day
+  mutate(compdate = as.Date(paste(month,day,'2019', sep = '/'), format = '%m/%d/%Y'))
+```
+
+```{r plot_frosts_data}
+plt <- ggplot(tmp, aes(year, compdate, color=indicator)) + geom_line(lwd = 1) +
+  geom_smooth(method = 'lm', se = FALSE, lty = 2) +
+  scale_color_manual(values = cbep_colors(), name = '', labels = c('First Frost', 'Last Frost')) +
+  xlab('Year') +
+  ylab('Day of Year') +
+  theme_cbep()
+
+plt +
+  scale_y_date(date_breaks = '1 month', date_labels = '%b %e') +
+  theme(legend.position = c(0.75,0.5))
 ```

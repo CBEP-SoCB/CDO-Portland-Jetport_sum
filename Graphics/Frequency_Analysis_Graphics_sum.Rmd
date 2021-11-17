@@ -101,7 +101,7 @@ plt <- ggplot(textdatalong, aes(x=year))+
   
   geom_line(data = lines_df, aes(x=yr, y=value, color = prediction)) +
   
-  scale_color_manual(values = cbep_colors(), name = '',
+  scale_color_manual(values = cbep_colors()[c(4,5)], name = '',
                      labels = c('Below Freezing',
                                 'Below Zero')) +
 
