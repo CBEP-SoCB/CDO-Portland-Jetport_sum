@@ -2,7 +2,7 @@
 # Data downloaded using noaaweatherdataGUI.py.
 CBEP uses a custom Python program to download data from NOAA's online data
 repositories.  Specifically, data were accessed through NOAA's National Centers
-for Environnmental Information.
+for Environmental Information.
 
 Here, we have downloaded daily (GHCND) , monthly (GSOM), and annual (GSOY)
 weather summaries via API v2. Information on this API is available here:
@@ -25,14 +25,14 @@ set MYTOKEN equal to the value of the token you receive from NOAA.
 The "wide" data formatter makes some assumptions about the data being downloaded
 that does not hold for older data (principally that the data categories in the
 first portion of the downloaded data represent all possible categories).  It is
-thus safest with the daily data to download the data on "long" format, unless
+thus safest with the daily data to download the data in "long" format, unless
 you are downloading for relatively short periods of time when data categories
 remained consistent.
 
 The program is fairly slow for long data series, since  it usually submits HTTP
 requests for data on monthly intervals.  In our experience, each request takes
 from three to five seconds if the system is lightly loaded, and more if there
-are are delays.  That means a decade's worth of downloads takes on the order of
+are delays.  That means a decade's worth of downloads takes on the order of
 10*12 * 4 = 480 seconds ~ 8 minutes.  In practice we are often seeing longer
 delays.
 
