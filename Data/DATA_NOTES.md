@@ -7,7 +7,7 @@ use them in any analyses.
 This data was downloaded and examined, with the hope that we could generate a
 dataset of true two-day storm totals, but we ran into technical challenges, and
 decided it was not going to be worth the effort to solve them all.  These data
-have not been used in further analyses.  These notes are here to in case anyone
+have not been used in further analyses.  These notes are here in case anyone
 wants to look at hourly data in the future.
 
 The downloaded CSV file is confusing in its layout, but it does link to the
@@ -16,7 +16,7 @@ descriptions in the associated documentation.  It appears that when I requested
 precipitation records from different sources included here, and it is not
 immediately obvious how we should combine these different records.
 
-We bagan with removal of data from 2020.  For simplicity, we cut off the record 
+We began with removal of data from 2020.  For simplicity, we cut off the record 
 for our purposes Dec. 31, 2019.
 
 Next, we removed MISSING data, so we deleted records without any data and data 
@@ -38,7 +38,7 @@ in the 1960s.
 
 What we see in those years is the following:
 
-1.   Time shift from splitting at even hours to spliting a XX:51
+1.   Time shift from splitting at even hours to splitting a XX:51
 
 2.  SY_MT results begin to duplicate hourly values at 6 or 12 hour intervals.
     From 1996 through 2004, that code is ALMOST always associated with 0:00, 
