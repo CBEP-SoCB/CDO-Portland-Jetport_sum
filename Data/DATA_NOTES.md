@@ -62,7 +62,7 @@ SY-SA
 AUTO
 FM15 is nearly complete for most years
 
-'but we still have holes, especially in the latter half of the year for 1997-2002 or so.
+But we still have holes, especially in the latter half of the year for 1997-2002 or so.
 
 So, we need to do this in a more sophisticated way, which means reading it into R and manipulating it there to look for duplicates...
 
