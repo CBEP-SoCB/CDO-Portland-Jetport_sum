@@ -84,8 +84,8 @@ levels(factor(longannualdata$datatype))
 #> [41] "WDFG" "WDFM" "WSF1" "WSF2" "WSF5" "WSFG" "WSFM"
 ```
 
-And their frequencies. Most data records are available for all years, A
-handful, mostly wind related, are inly available more recently.
+And their frequencies. Most data records are available for all years, but a
+handful that are mostly wind related are only available more recently.
 
 ``` r
 longannualdata %>%
@@ -177,9 +177,9 @@ summary(mean.lm)
 ```
 
 So, mean annual temperature has increased about 0.037 degrees F per
-year, or about one degree C every twenty seven years. (Note thast this
-“average” may not be what we woulnd normally consider an average – I
-believe it’s the average of daily aversges of maximum and minimum
+year, or about one degree C every twenty seven years. (Note that this
+“average” may not be what we wouldn't normally consider an average – I
+believe it’s the average of daily averages of maximum and minimum
 temperatures.)
 
 ### Trend in Minimum Temperature
@@ -208,7 +208,7 @@ summary(min.lm)
 ```
 
 Minimum temperatures have increased substantially faster, climbing
-0.1338 degrees per year, or climinag about one degree F every seven
+0.1338 degrees per year, or climbing about one degree F every seven
 years.
 
 ``` r
