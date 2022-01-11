@@ -44,11 +44,12 @@ longannualdata <- read_csv(paste(sibling,fn, sep = '/')) %>%
 
 Making sense of that data requires looking at the metadata, but here's a list of 
 the datatypes included.
+
 ```{r}
 levels(factor(longannualdata$datatype))
 ```
-And their frequencies.  Most data records are available for all years,  A 
-handful, mostly wind related, are inly available more recently.
+And their frequencies.  Most data records are available for all years, a 
+handful that are mostly wind related, are only available more recently.
 ```{r}
 longannualdata %>%
   group_by(datatype) %>%
@@ -98,16 +99,16 @@ Remember the mean temperature is based on means of maximums and minimums, in par
 summary(mean.lm)
 ```
 So, mean annual temperature has increased about 0.037 degrees F per year, or
-about one degree C every twenty seven years. (Note thast this "average" may not
-be what we woulnd normally consider an average -- I believe it's the average of
-daily aversges of maximum and minimum temperatures.)
+about one degree C every twenty seven years. (Note that this "average" may not
+be what we would normally consider an average -- we believe it's the average of
+daily averages of maximum and minimum temperatures.)
 
 ### Trend in Minimum Temperature
 ```{r}
 summary(min.lm)
 ```
 Minimum temperatures have increased substantially faster, climbing 0.1338 
-degrees per year, or climinag about one degree F every seven years.
+degrees per year, or climbing about one degree F every seven years.
 ```{r}
 oldpar <- par(mfrow=c(2,2))
 plot(min.lm)

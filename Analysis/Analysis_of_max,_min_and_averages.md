@@ -27,18 +27,11 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
 ``` r
 library(tidyverse)
-#> Warning: package 'tidyverse' was built under R version 4.0.5
 #> -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
 #> v ggplot2 3.3.5     v purrr   0.3.4
-#> v tibble  3.1.4     v dplyr   1.0.7
-#> v tidyr   1.1.3     v stringr 1.4.0
-#> v readr   2.0.1     v forcats 0.5.1
-#> Warning: package 'ggplot2' was built under R version 4.0.5
-#> Warning: package 'tibble' was built under R version 4.0.5
-#> Warning: package 'tidyr' was built under R version 4.0.5
-#> Warning: package 'readr' was built under R version 4.0.5
-#> Warning: package 'dplyr' was built under R version 4.0.5
-#> Warning: package 'forcats' was built under R version 4.0.5
+#> v tibble  3.1.6     v dplyr   1.0.7
+#> v tidyr   1.1.4     v stringr 1.4.0
+#> v readr   2.1.1     v forcats 0.5.1
 #> -- Conflicts ------------------------------------------ tidyverse_conflicts() --
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
@@ -84,8 +77,8 @@ levels(factor(longannualdata$datatype))
 #> [41] "WDFG" "WDFM" "WSF1" "WSF2" "WSF5" "WSFG" "WSFM"
 ```
 
-And their frequencies. Most data records are available for all years, A
-handful, mostly wind related, are inly available more recently.
+And their frequencies. Most data records are available for all years, a
+handful that are mostly wind related, are only available more recently.
 
 ``` r
 longannualdata %>%
@@ -177,9 +170,9 @@ summary(mean.lm)
 ```
 
 So, mean annual temperature has increased about 0.037 degrees F per
-year, or about one degree C every twenty seven years. (Note thast this
-“average” may not be what we woulnd normally consider an average – I
-believe it’s the average of daily aversges of maximum and minimum
+year, or about one degree C every twenty seven years. (Note that this
+“average” may not be what we would normally consider an average – we
+believe it’s the average of daily averages of maximum and minimum
 temperatures.)
 
 ### Trend in Minimum Temperature
@@ -208,7 +201,7 @@ summary(min.lm)
 ```
 
 Minimum temperatures have increased substantially faster, climbing
-0.1338 degrees per year, or climinag about one degree F every seven
+0.1338 degrees per year, or climbing about one degree F every seven
 years.
 
 ``` r
