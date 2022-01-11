@@ -1,48 +1,59 @@
 
-# Data downloaded using noaaweatherdataGUI.py.
-CBEP uses a custom Python program to download data from NOAA's online data
-repositories.  Specifically, data were accessed through NOAA's National Centers
-for Environmental Information.
+# Historical Weather Data from the Portland Jetport
 
-Here, we have downloaded daily (GHCND) , monthly (GSOM), and annual (GSOY)
-weather summaries via API v2. Information on this API is available here:
+<img
+    src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+    style="position:absolute;top:10px;right:50px;" />
+
+# Data downloaded using noaaweatherdataGUI.py.
+CBEP used a custom Python program to download data from NOAA's online data
+repositories.
+
+We  downloaded daily (GHCND) and annual (GSOY) weather summaries via API v2. 
+Information on this API is available here:
 https://www.ncdc.noaa.gov/cdo-web/webservices/v2
 
 Documentation on specific datasets is available at
 https://www.ncdc.noaa.gov/cdo-web/datasets
 
 ## Software Access
-CBEP's python program is available in this repository. This is not a polished
-program, and may or may not work "out of the box." Some functionality implied by
-the User Interface is incomplete. This software is in ongoing development by
-CBEP staff, but the version here will not be regularly updated.  For the most
-up-to-date version, contact CBEP.
+CBEP's python program helps manage data download and assembling of a continuous
+data record through the API.  The code is not available in this repository. It 
+is included in a companion detailed
+[data archive](https://github.com/CBEP-SoCB-Details/CDO-Portland-Jetport.git),
+along with rudimentary useage notes.  It is not a polished program, and may or 
+may not work "out of the box." 
 
-To use the program, you will need to get an access token from NOAA (see the
-website describing the API, above), and modify the code slightly on line 43 to
-set MYTOKEN equal to the value of the token you receive from NOAA.
+## Data Files
+THe two data files are both in "long" data format, with the following data columns:
 
-The "wide" data formatter makes some assumptions about the data being downloaded
-that does not hold for older data (principally that the data categories in the
-first portion of the downloaded data represent all possible categories).  It is
-thus safest with the daily data to download the data in "long" format, unless
-you are downloading for relatively short periods of time when data categories
-remained consistent.
+Variable Name |  Meaning                     
+--------------|---------------------------------------------------------------
+date          | date , YYYY-MM-DDT00:00:00 (January 1 of year for annual data)
+datatype      | NOAA code for data attributes
+value         | Numerical value, interpreted according to datatype
+attributes    | NOAA data quality qualifiers
+station       | Portland Jetport is GHCND:USW00014764
 
-The program is fairly slow for long data series, since  it usually submits HTTP
-requests for data on monthly intervals.  In our experience, each request takes
-from three to five seconds if the system is lightly loaded, and more if there
-are delays.  That means a decade's worth of downloads takes on the order of
-10*12 * 4 = 480 seconds ~ 8 minutes.  In practice we are often seeing longer
-delays.
+### `longdailydata.csv`
+Contains "daily" summary data on weather conditions observed at the Portland 
+Jetport beginning in 1940.  This data was used to calculate annual days of first
+and last frost, length of growing season, and number of days with large (> 2 
+inch) storm events.
 
-## Original Data File Names
-Data was downloaded to five files:
-longdailydata.csv
-longmonthlydata.csv
-widemonthlydata.csv
-longannualdata.csv
-wideannualdata.csv
+### `longannualdata.csv`
+Contains "annual" summary data on weather conditions observed at the Portland 
+Jetport beginning in 1940. This file includes data on things like total annual 
+precipitation, maximum annual temperature, minimum annual temperature, etc.
+
+## Metadata
+### `summary_of_monthly_and _annual_data_fields.docx`
+We provide a word document containing a table with metadata defining the
+data types contained in these files.  This file was derived and simplified from
+metadata provided by NOAA.  Additional NOAA metadata iles are available at the
+companion detailed 
+[data archive](https://github.com/CBEP-SoCB-Details/CDO-Portland-Jetport.git), 
+or directly from NOAA, at the URLs provided, above.
 
 # Other Data Downloads
 In searching for alternative data on which to base analysis of precipitation

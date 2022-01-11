@@ -36,13 +36,11 @@ clarity.
 # Summary of Data Sources
 All data are derived from data available from NOAA National Centers for
 Environmental Information (NOAA NCEI).  Raw data were downloaded from NOAA's
-online repositories using a Python script using a Public NOAA API.  Details are
-included in a "DATA_SOURCES.md" file in the "Data" folder.
-
-We principally used two different data sets, both accessed through the API.
+online repositories using a Python script using a Public NOAA API. We 
+principally used two different data sets, both accessed through the API.
 
 - GHCND.  Global Historical Climatology Network Daily; Daily data; used here to 
-derive length of the growing season, and number of very large storm days 
+derive length of the growing season, and the number of large storm days 
 (> 2 inches of rain) each year.
 
 - GSOY (Global Summary of the Year; Yearly Summaries; used here for all other 
